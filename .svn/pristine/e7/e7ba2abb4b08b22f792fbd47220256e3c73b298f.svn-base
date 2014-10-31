@@ -1,0 +1,311 @@
+package com.gw.monitor.alphaenvmonitor.monitor;
+
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.ChannelHandler.Sharable;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.util.AttributeKey;
+
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.FileInputStream;  
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
+import java.util.ResourceBundle;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.gw.monitor.alphaenvmonitor.domain.ClientStatus;
+import com.gw.monitor.alphaenvmonitor.domain.InstanceMonitorStatus;
+import com.gw.monitor.alphaenvmonitor.domain.MonitorStatus;
+import com.gw.monitor.alphaenvmonitor.domain.ServerStatus;
+
+import net.sf.json.JSONObject;
+
+import java.io.BufferedInputStream;  
+
+@Sharable
+public class MonitorServerHandler extends SimpleChannelInboundHandler<String> {
+
+    private static final Logger logger = Logger.getLogger(MonitorServerHandler.class.getName());
+
+    //hostsAndIPs
+    private EventLoopGroup group = new NioEventLoopGroup();
+    private Bootstrap b = new Bootstrap();
+    
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        b.group(group)
+         .channel(NioSocketChannel.class)
+         .handler(new StatusCollectorInitializer());
+        
+        
+        ctx.write(
+                "Welcome to " + InetAddress.getLocalHost().getHostName() + "!\r\n");
+        ctx.write("It is " + new Date() + " now.\r\n");
+        ctx.flush();
+    }
+
+    @Override
+    public void channelRead0(ChannelHandlerContext ctx, String request) throws Exception {
+        String response;
+        String[] hostInfo;
+//        String monitorStatus = null;
+          
+		hostInfo = request.split(" ");
+		if(hostInfo.length ==2){
+			response = monitorStatus(hostInfo);    			
+		} else {
+            response = "Please type host ip and port for monitor.\r\n";   			
+		}     
+           	       
+//        method2();    	
+//        method3();
+                                   
+        boolean close = false;
+//        if (request.isEmpty()) {
+//            response = "Please type something.\r\n";
+//        } else if ("bye".equals(request.toLowerCase())) {
+//            response = "Have a good day!\r\n";
+//            close = true;
+//        } else {
+//            response = "Did you say '" + request + "'?\r\n";
+//        }
+
+//        response = monitorStatus;
+        
+
+        ChannelFuture future = ctx.write(response);
+
+        if (close) {
+            future.addListener(ChannelFutureListener.CLOSE);
+        }
+    }
+
+
+    private void readPropertiesFile() {
+    	
+    	InputStream is = this.getClass().getResourceAsStream("hosts.properties");// /hosts.properties
+        Properties properties = new Properties();   
+        try {
+			properties.load(is);
+			
+			String value = properties.getProperty("hostsAndIPs");
+			
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}  	 
+        
+        
+//        InputStream in;
+//		try {
+//			in = new BufferedInputStream(new FileInputStream("hosts.properties"));
+//	        Properties p = new Properties();   
+//	        p.load(in);  	        
+//		} catch (FileNotFoundException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}   
+//
+//        
+////    	ResourceBundle rb = ResourceBundle.getBundle("hosts.properties", Locale.getDefault()); 
+//    	ResourceBundle rb1 = ResourceBundle.getBundle("hosts", Locale.getDefault());
+    }
+    
+    
+	private String monitorStatus(String[] hostInfo) throws InterruptedException {		
+		///// for test
+//    	SocketAddress remoteAddress = new InetSocketAddress("10.15.88.73", 3306);
+//    	SocketAddress localAddress = new InetSocketAddress("localhost", 8777);  // 监控接口
+        
+		String remoteHostIp = hostInfo[0];
+		String remoteHostPort = hostInfo[1]; 
+		
+		readPropertiesFile();
+		
+		InetSocketAddress remoteAddress = new InetSocketAddress(remoteHostIp, Integer.valueOf(remoteHostPort));
+		InetSocketAddress localAddress = new InetSocketAddress("localhost", 8777);  // 监控接口
+    	
+
+            
+//            Channel ch = b.connect(host, port).sync().channel();
+            
+            b.bind(localAddress);	            
+            Channel ch = b.connect(remoteAddress).sync().channel();
+            
+//            ch.attr(START_TIME).set(new Date());            
+//            Channel ch = b.connect(remoteAddress, localAddress).sync().channel();
+                        
+            group.register(ch);
+            
+            
+            return jsonResponse(ch, remoteAddress);
+
+//          speedComputation(ch);
+	}
+
+	private void speedComputation(Channel ch) throws InterruptedException {
+		//            Channel c = ch.read();            
+		            ChannelFuture lastWriteFuture = null;
+		                        
+		            /////
+		            String line = "string to request";    
+		            lastWriteFuture = ch.writeAndFlush(line + "\r\n");
+		            ChannelFuture cf= lastWriteFuture.sync();  
+		//            Channel cl = ch.read();
+		            ch.closeFuture().sync();
+		            /////
+		            
+		//            ch.attr(END_TIME).set(new Date());
+		            
+		////            BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+		////            for (;;) {
+		//                String line = "test-test-test";
+		////                if (line == null) {
+		////                    break;
+		////                }
+		//                 
+		//                // Sends the received line to the server.
+		//                lastWriteFuture = ch.writeAndFlush(line + "\r\n");
+		//
+		//                
+		//                // If user typed the 'bye' command, wait until the server closes
+		//                // the connection.
+		//                if ("bye".equals(line.toLowerCase())) {
+		//                    ch.closeFuture().sync();
+		////                    break;
+		//                }
+		////            }
+		//                
+		//                Channel cl = ch.read();
+		//                
+		//            // Wait until all messages are flushed before closing the channel.
+		////            if (lastWriteFuture != null) {
+		////                lastWriteFuture.sync();
+		////            }
+		//    	/////
+	}
+
+	private String jsonResponse(Channel ch, InetSocketAddress remoteAddress) {
+
+        boolean isActive= ch.isActive();
+        boolean isOpen= ch.isOpen();
+        boolean isRegistered= ch.isRegistered();
+        boolean isWritable = ch.isWritable();   
+        
+//        SocketAddress sa = ch.remoteAddress();  // null
+        
+//      String  = remoteAddress.getHostName();
+        String address= remoteAddress.getAddress().getHostAddress();
+        int port = remoteAddress.getPort();
+        //////////////////////
+        //
+        ClientStatus cs = new ClientStatus();
+        cs.setClienttotal(0);
+        List<ClientStatus> csList = new ArrayList<ClientStatus>();
+        csList.add(cs);
+
+        ServerStatus ss = new ServerStatus();
+        ss.setServer("ip:port =  " + address +":"+ port);
+        ss.setConn(isActive? "ok":"not ok");
+        ss.setSpeed(0);
+        ss.setSlow(0);
+        List<ServerStatus>  ssList = new ArrayList<ServerStatus>();       
+        ssList.add(ss);
+        
+        MonitorStatus ms = new MonitorStatus();
+        ms.setClients(csList);
+        ms.setServers(ssList);
+        
+        //
+        InstanceMonitorStatus ims = new InstanceMonitorStatus();  
+        
+        InetSocketAddress isa = (InetSocketAddress) ch.localAddress();
+        String localAddress = isa.getAddress().getHostAddress();
+        int  localPort = isa.getPort();
+
+        ims.setIp(localAddress);
+        ims.setPort(String.valueOf(localPort));
+        ims.setType(1);
+        ims.setBuildtime(new Date().toString());
+        ims.setInfo(ms);
+
+        //object转JSONObject 
+        JSONObject imsJsObj = JSONObject.fromObject(ims);    
+		
+        return imsJsObj.toString(4);
+	}
+	
+	// socket 
+	private void method2() throws UnknownHostException, IOException {
+//            byte[] bs0 = new byte[] { (byte) 127, (byte) 0, (byte) 0, (byte) 1  };  // ...            
+//            InetAddress localHost = InetAddress.getByAddress(bs0);          
+            InetAddress localHost = InetAddress.getLocalHost();
+            
+            byte[] bs1 = new byte[] { (byte) 10, (byte) 15, (byte) 88, (byte) 73  };  // ...
+            InetAddress remoteHost = InetAddress.getByAddress(bs1);
+            
+            Socket socket1 = new Socket(remoteHost, 3306, localHost, 8080);
+            boolean isBound= socket1.isBound();
+            boolean isClosed= socket1.isClosed();
+            boolean isConnected= socket1.isConnected();
+            boolean isInputShutdown = socket1.isInputShutdown();
+            boolean isOutputShutdown = socket1.isOutputShutdown();   
+            
+            socket1.close();
+	}
+
+	// socket
+	private void method3() throws UnknownHostException, IOException {
+//		byte[] bs2 = new byte[] { (byte) 127, (byte) 0, (byte) 0, (byte) 1  };  // ...             
+//		InetAddress localHost2 = InetAddress.getByAddress(bs2);
+          
+		InetAddress localHost2 = InetAddress.getLocalHost();
+		
+		byte[] bs3 = new byte[] { (byte) 10, (byte) 15, (byte) 88, (byte) 333  };  // error address // exception
+		InetAddress remoteHost2 = InetAddress.getByAddress(bs3);
+		
+		Socket socket2 = new Socket(remoteHost2, 3306, localHost2, 8777);
+		boolean isBound2= socket2.isBound();
+		boolean isClosed2= socket2.isClosed();
+		boolean isConnected2= socket2.isConnected();
+		boolean isInputShutdown2 = socket2.isInputShutdown();
+		boolean isOutputShutdown2 = socket2.isOutputShutdown();
+
+		socket2.close();
+	}
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        ctx.flush();
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        logger.log(
+                Level.WARNING,
+                "Unexpected exception from downstream.", cause);
+        ctx.close();
+    }
+}

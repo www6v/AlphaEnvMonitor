@@ -1,0 +1,22 @@
+{"ip": "192.168.0.9" , "port": 81 , "type": 1, "buildtime": "2010-08-04 11:41:07",
+    
+
+"info":
+    [ 
+   { "client": [    { "clienttotal": 8419 } 
+               ] 
+    },
+ 
+    { "server": [ 
+     
+                    { "server": "ip:port = 222.73.171.233:7000", "conn": "ok", "speed": 2832, "slow": 0 }, 
+     
+                    { "server": "ip:port = 114.80.231.2:7000", "conn": "ok", "speed": 136712, "slow": 0 }
+     
+                ] 
+     
+    } 
+  ]
+   
+
+} 
